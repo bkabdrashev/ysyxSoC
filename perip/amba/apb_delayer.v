@@ -44,9 +44,9 @@ r*s = 507_701
   logic        in_pready_d;
   logic [31:0] in_prdata_d;
   logic        in_pslverr_d;
+  logic        out_psel_q, out_psel_d;
 
-  logic [63:0] wait_counter, wait_counter_d;
-  logic [63:0] delay,        delay_d;
+  logic [63:0] wait_counter, wait_counter_d; // counts number of device cycles to wait for response times R*S
 
   assign out_paddr   = in_paddr;
   assign out_penable = in_penable;
@@ -54,7 +54,6 @@ r*s = 507_701
   assign out_pstrb   = in_pstrb;
   assign out_pwdata  = in_pwdata;
   assign out_pwrite  = in_pwrite;
-  assign out_psel    = in_psel;
 
   always_ff @(posedge clock or posedge reset) begin
     if (reset) begin
@@ -62,14 +61,12 @@ r*s = 507_701
       in_prdata    <= 32'b0;
       in_pslverr   <= 1'b0;
       wait_counter <= 64'b0;
-      delay        <= 64'b0;
       curr_state   <= IDLE;
     end
     else begin
       in_pready    <= in_pready_d;
       in_prdata    <= in_prdata_d;
       in_pslverr   <= in_pslverr_d;
-      delay        <= delay_d;
       wait_counter <= wait_counter_d;
       curr_state   <= next_state;
     end
@@ -79,6 +76,7 @@ r*s = 507_701
     in_pready_d   = in_pready;
     in_prdata_d   = in_prdata;
     in_pslverr_d  = in_pslverr;
+    out_psel      = 1'b0;
     case (curr_state)
       IDLE: begin
         next_state = IDLE;
@@ -86,16 +84,16 @@ r*s = 507_701
         in_prdata_d  = 32'b0;
         in_pslverr_d = 1'b0;
         if (in_psel) begin
-          wait_counter_d = 64'd0;
+          out_psel       = 1'b1;
           next_state     = WAIT;
         end
       end
       WAIT: begin
+        out_psel       = 1'b1;
         if (out_pready) begin
           in_pready_d  = 1'b0;
           in_prdata_d  = out_prdata;
           in_pslverr_d = out_pslverr;
-          delay_d      = wait_counter;
           next_state   = DELAY;
         end
         else begin
@@ -104,13 +102,14 @@ r*s = 507_701
         end
       end
       DELAY: begin
-        if (delay < S) begin
+        if (wait_counter < S) begin
+          // NOTE: Here wait_counter is non-zero -- which is okay -- since we want to wait this fractional <1 cycle.
+          //       Therefore, we simply accumulate this fractional wait_counter delay for the next request.
           in_pready_d = 1'b1;
           next_state  = IDLE;
-          delay_d = 64'b0;
         end
         else begin
-          delay_d = delay - S;
+          wait_counter_d = wait_counter - S;
           next_state = DELAY;
         end
       end
