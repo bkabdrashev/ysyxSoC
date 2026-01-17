@@ -41,7 +41,6 @@ r*s = 507_701
   apb_state next_state;
   apb_state curr_state;
 
-  logic        in_pready_d;
   logic [31:0] in_prdata_d;
   logic        in_pslverr_d;
   logic        out_psel_q, out_psel_d;
@@ -57,14 +56,12 @@ r*s = 507_701
 
   always_ff @(posedge clock or posedge reset) begin
     if (reset) begin
-      in_pready    <= 1'b0;
       in_prdata    <= 32'b0;
       in_pslverr   <= 1'b0;
       wait_counter <= 64'b0;
       curr_state   <= IDLE;
     end
     else begin
-      in_pready    <= in_pready_d;
       in_prdata    <= in_prdata_d;
       in_pslverr   <= in_pslverr_d;
       wait_counter <= wait_counter_d;
@@ -73,14 +70,13 @@ r*s = 507_701
   end
 
   always_comb begin
-    in_pready_d   = in_pready;
+    in_pready     = 1'b0;
     in_prdata_d   = in_prdata;
     in_pslverr_d  = in_pslverr;
     out_psel      = 1'b0;
     case (curr_state)
       IDLE: begin
-        next_state = IDLE;
-        in_pready_d  = 1'b0;
+        next_state   = IDLE;
         in_prdata_d  = 32'b0;
         in_pslverr_d = 1'b0;
         if (in_psel) begin
@@ -91,7 +87,7 @@ r*s = 507_701
       WAIT: begin
         out_psel       = 1'b1;
         if (out_pready) begin
-          in_pready_d  = 1'b0;
+          in_pready    = 1'b0;
           in_prdata_d  = out_prdata;
           in_pslverr_d = out_pslverr;
           next_state   = DELAY;
@@ -105,8 +101,8 @@ r*s = 507_701
         if (wait_counter < S) begin
           // NOTE: Here wait_counter is non-zero -- which is okay -- since we want to wait this fractional <1 cycle.
           //       Therefore, we simply accumulate this fractional wait_counter delay for the next request.
-          in_pready_d = 1'b1;
-          next_state  = IDLE;
+          in_pready  = 1'b1;
+          next_state = IDLE;
         end
         else begin
           wait_counter_d = wait_counter - S;
