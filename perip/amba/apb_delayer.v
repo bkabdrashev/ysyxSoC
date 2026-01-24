@@ -23,16 +23,8 @@ module apb_delayer(
   input  logic [31:0] out_prdata,
   input  logic        out_pslverr
 );
-/*
-cf = 473.630 MHz
-df = 100.000 MHz
-r = cf / df = 4.73630
-s = 100_000
-r*s = 473_630
-*/
-
  localparam S  = 100_000;
- localparam RS = 473_630;
+ `include "freq_defines.vh"
 
   typedef enum logic [1:0] {
     IDLE, WAIT, DELAY
